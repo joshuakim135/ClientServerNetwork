@@ -70,7 +70,8 @@ int TCPRequestChannel::serverSetUp(const string port) {
         perror("listen");
         exit(1);
     }
-
+    cout << "Server is ready in port " << port << endl;
+    /*
     cout << "server: waiting for connections..." << endl;
     char buf[1024];
     while(1) {
@@ -84,6 +85,7 @@ int TCPRequestChannel::serverSetUp(const string port) {
         t.detach();
     }
     return 0;
+    */
 }
 
 int TCPRequestChannel::clientSetUp(const string host, const string port) {
@@ -115,7 +117,7 @@ int TCPRequestChannel::clientSetUp(const string host, const string port) {
     cout << "Connected" << endl;
     // now free the memory dynamically allocated onto the res pointer by the getaddrinfo function
     freeaddrinfo(res);
-    talk_to_server(sockfd);
+    // talk_to_server(sockfd);
     return 0;
 }
 
