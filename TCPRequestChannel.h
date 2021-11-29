@@ -2,6 +2,13 @@
 #define _TCPRequestChannel_H_
 
 #include "common.h"
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <string.h>
+#include <stdlib.h>
+
 
 class TCPRequestChannel {
     private:
@@ -12,8 +19,8 @@ class TCPRequestChannel {
         ~TCPRequestChannel();
         int cread(void* msgbuf, int buflen);
         int cwrite(void* msgbuf, int msglen);
-        void serverSetUp(const string port);
-        void clientSetUp(const string host, const string port);
+        int serverSetUp(const string port);
+        int clientSetUp(const string host, const string port);
         int getfd() {
             return sockfd;
         };
