@@ -4,6 +4,7 @@
 #include "common.h"
 #include "HistogramCollection.h"
 #include "FIFOreqchannel.h"
+#include "TCPRequestChannel.h"
 
 #include <thread>
 #include <sys/wait.h>
@@ -23,7 +24,7 @@ void patient_thread_function(int p, int n, BoundedBuffer* request_buffer){
     }
 }
 
-void file_helper(string revName, string filename, char* buf, FIFORequestChannel* chan) {
+void file_helper(string revName, string filename, char* buf, TCPRequestChannel* chan) {
     FileRequest f(0,0);
     memcpy(buf, &f, sizeof(f));
     strcpy(buf + sizeof(f), filename.c_str());
@@ -36,7 +37,7 @@ void file_helper2(string recvName, int64_t filelength) {
     fclose(fp);
 }
 
-void file_thread_function(string filename, BoundedBuffer* request_buffer, FIFORequestChannel* chan, int bufcap) {
+void file_thread_function(string filename, BoundedBuffer* request_buffer, TCPRequestChannel* chan, int bufcap) {
     // same as PA 3
     string recvName = "received/" + filename;
     char buf[1024];
@@ -55,7 +56,7 @@ void file_thread_function(string filename, BoundedBuffer* request_buffer, FIFORe
     }
 }
 
-void worker_thread_function(BoundedBuffer* request_buffer, FIFORequestChannel* wchan, BoundedBuffer* response_buffer, int bufcap){
+void worker_thread_function(BoundedBuffer* request_buffer, TCPRequestChannel* wchan, BoundedBuffer* response_buffer, int bufcap){
     char buf [1024];
     char recvbuf [bufcap];
 
@@ -109,11 +110,12 @@ int main(int argc, char *argv[]) {
     int w = 100; // default number of worker threads
     int b = 1024; // default cap of Bounded buffers
 	int m = MAX_MESSAGE; // default cap of message buffer
-    int h = 5;
     string filename = "";
+    string host, port;
+    int histThreadNum = 10;
     bool fileReq = false;
     
-    while((opt = getopt(argc, argv, "n:p:w:b:m:f:h:")) != -1) {
+    while((opt = getopt(argc, argv, "n:p:w:b:m:f:h:r:")) != -1) {
         switch (opt) {
             case 'n':
                 n = atoi(optarg);
@@ -135,42 +137,27 @@ int main(int argc, char *argv[]) {
                 fileReq = true;
                 break;
             case 'h':
-                h = atoi(optarg);
+                host = atoi(optarg);
                 break;
-            
+            case 'r':
+                port = optarg;
+                break;
         }
     }
-
-    int pid = fork ();
-	if (pid < 0){
-		EXITONERROR ("Could not create a child process for running the server");
-	}
-	if (!pid) { // The server runs in the child process
-		char serverName[] = "./server";
-		char* args[] = {"./server", "-m",(char*)to_string(m).c_str(), nullptr};
-		
-		if (execvp(args[0], args) < 0){
-			EXITONERROR ("Could not launch the server");
-		}
-	}
     
-	FIFORequestChannel* chan = new FIFORequestChannel("control", FIFORequestChannel::CLIENT_SIDE);
+    TCPRequestChannel* chan = new TCPRequestChannel(host, port);
     BoundedBuffer requestBuffer(b);
     BoundedBuffer responseBuffer(b);
 	HistogramCollection hc;
 
     thread patients [p];
     thread workers [w];
-    thread hists [h];
-    FIFORequestChannel* wchans [w];
+    thread hists[histThreadNum];
+    TCPRequestChannel* wchans [w];
 
     // create channels
-    for(int i = 0; i < w; i++) {
-        REQUEST_TYPE_PREFIX m = NEWCHAN_REQ_TYPE;
-        chan->cwrite(&m, sizeof(m));
-        char newchanname [100];
-        chan->cread(newchanname, sizeof(newchanname));
-        wchans [i] = new FIFORequestChannel(newchanname, FIFORequestChannel::CLIENT_SIDE);
+    for (int i = 0; i < w; i++) {
+        wchans[i] = new TCPRequestChannel (host, port);
     }
 
     if(filename == "") { // initialize histogram
@@ -191,7 +178,7 @@ int main(int argc, char *argv[]) {
         for(int i = 0; i < w; i++) {
             workers[i] = thread(worker_thread_function, &requestBuffer, wchans[i], &responseBuffer, m);
         }
-        for(int i = 0; i < h; i++) {
+        for(int i = 0; i < histThreadNum; i++) {
             hists[i] = thread(histogram_thread_function, &responseBuffer, &hc);
         }
     }
@@ -216,14 +203,14 @@ int main(int argc, char *argv[]) {
     }
     for (int i = 0; i<w; i++)
         workers[i].join();
-
+    
     // 5/6. get rid of histogram threads and join them
     if (!fileReq) {
         // break condition for hist threads
         Response r {-1, 0}; 
-        for(int i = 0; i<h; i++)
+        for(int i = 0; i<histThreadNum; i++)
             responseBuffer.push((char*) &r, sizeof(r));
-        for(int i = 0; i<h; i++)
+        for(int i = 0; i<histThreadNum; i++)
             hists[i].join();
     }
     

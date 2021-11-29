@@ -135,9 +135,9 @@ TCPRequestChannel::~TCPRequestChannel() {
 }
 
 int TCPRequestChannel::cread(void* msgbuf, int buflen) {
-    return read(sockfd, msgbuf, buflen);
+    return recv(sockfd, msgbuf, buflen, 0);
 }
 
 int TCPRequestChannel::cwrite(void* msgbuf, int msglen) {
-    return write(sockfd, msgbuf, msglen);
+    return send(sockfd, msgbuf, msglen, 0);
 }
