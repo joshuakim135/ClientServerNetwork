@@ -20,13 +20,12 @@ using namespace std;
 int buffercapacity = MAX_MESSAGE;
 char* buffer = NULL; // buffer used by the server, allocated in the main
 
-
 int nchannels = 0;
 pthread_mutex_t newchannel_lock;
 void handle_process_loop(TCPRequestChannel *_channel);
 char ival;
 vector<string> all_data [NUM_PERSONS];
-vector<thread> channel_threads;
+vector<thread*> channel_threads;
 
 void populate_file_data (int person){
 	//cout << "populating for person " << person << endl;
@@ -182,7 +181,7 @@ int main(int argc, char *argv[]){
 				buffercapacity = atoi (optarg);
 				break;
 			case 'r':
-				port = optarg;
+				port = std::string(optarg);
 				break;
 		}
 	}
@@ -191,19 +190,49 @@ int main(int argc, char *argv[]){
 		populate_file_data(i+1);
 	}
 	
-	struct sockaddr_storage clientAddr;
+	int sockfd, new_fd;
+	struct addrinfo hints, *serv;
+	struct sockaddr_storage client_addr;
 	socklen_t sin_size;
-	TCPRequestChannel* chan = new TCPRequestChannel("", port);
-	while(true) {
-		sin_size = sizeof(clientAddr);
-		int client_socket = accept (chan->getfd(), (struct sockaddr*)&clientAddr, &sin_size);
+	char s[INET6_ADDRSTRLEN];
+	int rv;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+
+	if ((rv = getaddrinfo(NULL, port.c_str(), &hints, &serv)) != 0) {
+		cerr << "getaddrinfo: " << gai_strerror(rv) << endl;
+	}
+	if ((sockfd = socket(serv->ai_family, serv->ai_socktype, serv->ai_protocol)) == -1) {
+		perror("server: socket");
+		return -1;
+	}
+	if (bind(sockfd, serv->ai_addr, serv->ai_addrlen) == -1) {
+		close(sockfd);
+		perror("server: bind");
+		return -1;
+	}
+	freeaddrinfo(serv);
+	if (listen(sockfd, 20) == -1) {
+		perror("listen");
+		exit(1);
+	}
+	cout << "server: waiting for connections..." << endl;
+	char buf[1024];
+	while (true) {
+		sin_size = sizeof(client_addr);
+		int client_socket = accept(sockfd, (struct sockaddr*)&client_addr, &sin_size);
 		if (client_socket == -1) {
-			perror("Accept");
+			perror("accept");
 			continue;
 		}
-		TCPRequestChannel* client_chan = new TCPRequestChannel(client_socket);
-		thread t(handle_process_loop, client_chan);
-		t.detach();
+		TCPRequestChannel* control = new TCPRequestChannel(client_socket);
+		thread *T = new thread(handle_process_loop, control);
+		channel_threads.push_back(T);
+		T->detach();
+		cout << "Connection with " << control->getfd() << " opened by client" << endl;
 	}
 	cout << "Server process exited" << endl;
 }

@@ -22,24 +22,6 @@ void connection_handler (int client_socket) {
     }
 }
 
-void talk_to_server (int sockfd) {
-    char buf[1024];
-    while (true) {
-        cout << "Type a number for the server: ";
-        int num;
-        cin >> num;
-        if (send (sockfd, &num, sizeof(int), 0) == -1) {
-            perror("client: Send failure");
-            break;
-        }
-        if (recv(sockfd, buf, sizeof(buf), 0) < 0) {
-            perror("client: Receive failure");
-            exit(0);
-        }
-        cout << "The server sent back " << *(int*) buf << endl; 
-    }
-}
-
 int TCPRequestChannel::serverSetUp(const string port) {
     struct addrinfo hints, *serv;
     struct sockaddr_storage their_addr; // connector's addr info
@@ -71,7 +53,7 @@ int TCPRequestChannel::serverSetUp(const string port) {
         exit(1);
     }
     cout << "Server is ready in port " << port << endl;
-    /*
+    
     cout << "server: waiting for connections..." << endl;
     char buf[1024];
     while(1) {
@@ -85,7 +67,6 @@ int TCPRequestChannel::serverSetUp(const string port) {
         t.detach();
     }
     return 0;
-    */
 }
 
 int TCPRequestChannel::clientSetUp(const string host, const string port) {
@@ -115,9 +96,7 @@ int TCPRequestChannel::clientSetUp(const string host, const string port) {
     }
 
     cout << "Connected" << endl;
-    // now free the memory dynamically allocated onto the res pointer by the getaddrinfo function
     freeaddrinfo(res);
-    // talk_to_server(sockfd);
     return 0;
 }
 

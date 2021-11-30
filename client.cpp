@@ -137,10 +137,10 @@ int main(int argc, char *argv[]) {
                 fileReq = true;
                 break;
             case 'h':
-                host = atoi(optarg);
+                host = std::string(optarg);
                 break;
             case 'r':
-                port = optarg;
+                port = std::string(optarg);
                 break;
         }
     }
